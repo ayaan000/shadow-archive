@@ -10,6 +10,29 @@ export class World {
         this.transitionProgress = 0;
         this.transitioning = false;
         this.nextRegion = null;
+
+        // Generate terrain features for current region
+        this.terrainFeatures = this.generateTerrainFeatures();
+    }
+
+    generateTerrainFeatures() {
+        const features = [];
+        const region = this.currentRegion;
+
+        // Generate random terrain features based on region
+        const featureCount = 30 + Math.floor(Math.random() * 20);
+
+        for (let i = 0; i < featureCount; i++) {
+            features.push({
+                x: Math.random() * region.width,
+                y: Math.random() * region.height,
+                type: Math.floor(Math.random() * 3), // 0=tree, 1=rock, 2=grass
+                size: 20 + Math.random() * 40,
+                seed: Math.random() * 1000
+            });
+        }
+
+        return features;
     }
 
     update(deltaTime) {
@@ -20,6 +43,7 @@ export class World {
                 this.currentRegion = this.nextRegion;
                 this.transitioning = false;
                 this.transitionProgress = 0;
+                this.terrainFeatures = this.generateTerrainFeatures();
                 return true; // Transition complete
             }
         }
@@ -31,19 +55,98 @@ export class World {
         ctx.fillStyle = this.currentRegion.bgColor;
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
+        // Render terrain features first (behind entities)
+        this.renderTerrainFeatures(ctx, camera);
+
         // Add subtle ambient particles/stars
         this.renderAmbience(ctx, camera, canvasWidth, canvasHeight);
 
-        // Render subtle grid or texture
-        this.renderTexture(ctx, camera, canvasWidth, canvasHeight);
+        // Render atmospheric fog
+        this.renderFog(ctx, camera, canvasWidth, canvasHeight);
+    }
+
+    renderTerrainFeatures(ctx, camera) {
+        const region = this.currentRegion;
+
+        this.terrainFeatures.forEach(feature => {
+            const screenX = feature.x - camera.x;
+            const screenY = feature.y - camera.y;
+
+            // Only render if on screen (with margin)
+            if (screenX < -100 || screenX > ctx.canvas.width + 100 ||
+                screenY < -100 || screenY > ctx.canvas.height + 100) {
+                return;
+            }
+
+            ctx.save();
+            ctx.globalAlpha = 0.2 + Math.random() * 0.1;
+
+            if (feature.type === 0) {
+                // Tree-like shapes
+                ctx.fillStyle = region.accentColor;
+                ctx.beginPath();
+                ctx.moveTo(screenX, screenY - feature.size);
+                ctx.lineTo(screenX + feature.size * 0.4, screenY);
+                ctx.lineTo(screenX - feature.size * 0.4, screenY);
+                ctx.closePath();
+                ctx.fill();
+
+                // Trunk
+                ctx.fillStyle = region.accentColor;
+                ctx.globalAlpha = 0.15;
+                ctx.fillRect(screenX - 5, screenY, 10, feature.size * 0.3);
+            } else if (feature.type === 1) {
+                // Rock-like shapes
+                ctx.fillStyle = region.accentColor;
+                ctx.beginPath();
+                const sides = 5 + Math.floor(feature.seed % 3);
+                for (let i = 0; i < sides; i++) {
+                    const angle = (i / sides) * Math.PI * 2;
+                    const radius = feature.size * 0.5 * (0.8 + Math.sin(feature.seed + i) * 0.2);
+                    const x = screenX + Math.cos(angle) * radius;
+                    const y = screenY + Math.sin(angle) * radius;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.fill();
+            } else {
+                // Grass/shrub
+                ctx.strokeStyle = region.accentColor;
+                ctx.lineWidth = 2;
+                for (let i = 0; i < 5; i++) {
+                    const offset = (i - 2) * 8;
+                    ctx.beginPath();
+                    ctx.moveTo(screenX + offset, screenY);
+                    ctx.lineTo(screenX + offset + Math.sin(feature.seed + i) * 3,
+                        screenY - feature.size * 0.4);
+                    ctx.stroke();
+                }
+            }
+
+            ctx.restore();
+        });
+    }
+
+    renderFog(ctx, camera, width, height) {
+        // Vignette effect
+        const gradient = ctx.createRadialGradient(
+            width / 2, height / 2, width * 0.2,
+            width / 2, height / 2, width * 0.7
+        );
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(1, this.currentRegion.bgColor + 'aa');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
     }
 
     renderAmbience(ctx, camera, width, height) {
         // Draw floating particles based on region
-        const particleCount = 30;
+        const particleCount = 50;
         const time = Date.now() * 0.0003;
 
-        ctx.fillStyle = this.currentRegion.accentColor;
+        ctx.fillStyle = this.currentRegion.glowColor;
 
         for (let i = 0; i < particleCount; i++) {
             const seed = i * 1000;

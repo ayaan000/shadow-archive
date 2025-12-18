@@ -74,63 +74,92 @@ export class Entity {
         const screenX = this.x - camera.x;
         const screenY = this.y - camera.y;
 
-        // Determine opacity based on reveal progress
-        const shadowOpacity = 0.3 + this.revealProgress * 0.7;
-        const blurAmount = 20 * (1 - this.revealProgress);
-
-        // Draw glow for revealed entities
-        if (this.revealProgress > 0.3) {
-            const glowSize = this.size * (1.5 + this.revealProgress * 0.5);
-            const gradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, glowSize);
-            gradient.addColorStop(0, this.glowColor + Math.floor(100 * this.revealProgress).toString(16).padStart(2, '0'));
-            gradient.addColorStop(1, this.glowColor + '00');
-
-            ctx.fillStyle = gradient;
-            ctx.fillRect(screenX - glowSize, screenY - glowSize, glowSize * 2, glowSize * 2);
+        // Don't render if off-screen
+        if (screenX < -200 || screenX > ctx.canvas.width + 200 ||
+            screenY < -200 || screenY > ctx.canvas.height + 200) {
+            return;
         }
 
-        // Draw entity shape
+        // Determine opacity based on reveal progress
+        // Even undiscovered entities should be quite visible as shadows
+        const shadowOpacity = 0.6 + this.revealProgress * 0.4; // Increased from 0.3
+        const blurAmount = 10 * (1 - this.revealProgress); // Reduced blur
+
+        // Pulsing effect for undiscovered entities
+        const pulse = this.discovered ? 1 : (0.85 + Math.sin(Date.now() * 0.002 + this.x) * 0.15);
+        const displaySize = this.size * pulse;
+
+        // Draw larger outer glow for ALL entities (not just revealed)
+        const glowSize = displaySize * 2;
+        const glowOpacity = this.discovered ? 0.4 : 0.2;
+        const gradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, glowSize);
+
+        if (this.revealProgress > 0.1) {
+            gradient.addColorStop(0, this.glowColor + Math.floor(100 * glowOpacity).toString(16).padStart(2, '0'));
+            gradient.addColorStop(0.5, this.glowColor + Math.floor(50 * glowOpacity).toString(16).padStart(2, '0'));
+        } else {
+            gradient.addColorStop(0, 'rgba(100, 100, 120, ' + (glowOpacity * 0.5) + ')');
+            gradient.addColorStop(0.5, 'rgba(100, 100, 120, ' + (glowOpacity * 0.2) + ')');
+        }
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+        ctx.fillStyle = gradient;
+        ctx.fillRect(screenX - glowSize, screenY - glowSize, glowSize * 2, glowSize * 2);
+
+        // Draw entity shape with less blur
         ctx.save();
         ctx.filter = `blur(${blurAmount}px)`;
 
         if (this.isBoss) {
             // Boss: Large imposing shape
-            this.renderBoss(ctx, screenX, screenY, shadowOpacity);
+            this.renderBoss(ctx, screenX, screenY, shadowOpacity, displaySize);
         } else if (this.type === 'creature') {
             // Creature: Organic flowing shape
-            this.renderCreature(ctx, screenX, screenY, shadowOpacity);
+            this.renderCreature(ctx, screenX, screenY, shadowOpacity, displaySize);
         } else {
             // Artifact: Geometric shape
-            this.renderArtifact(ctx, screenX, screenY, shadowOpacity);
+            this.renderArtifact(ctx, screenX, screenY, shadowOpacity, displaySize);
         }
 
         ctx.restore();
 
-        // Pulsing effect for discovered entities
+        // Pulsing outer ring for discovered entities
         if (this.discovered) {
-            const pulse = 0.8 + Math.sin(Date.now() * 0.003) * 0.2;
-            ctx.globalAlpha = pulse * 0.3;
+            const ringPulse = 0.8 + Math.sin(Date.now() * 0.003) * 0.2;
+            ctx.globalAlpha = ringPulse * 0.4;
             ctx.strokeStyle = this.glowColor;
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.arc(screenX, screenY, this.size * 1.2, 0, Math.PI * 2);
+            ctx.arc(screenX, screenY, displaySize * 1.3, 0, Math.PI * 2);
             ctx.stroke();
             ctx.globalAlpha = 1;
         }
+
+        // Add discovery indicator (question mark for undiscovered, exclamation for discovered)
+        if (!this.discovered && this.revealProgress < 0.5) {
+            ctx.save();
+            ctx.globalAlpha = 0.6 * (1 - this.revealProgress * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = `${displaySize * 0.8}px Arial`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('?', screenX, screenY);
+            ctx.restore();
+        }
     }
 
-    renderBoss(ctx, x, y, opacity) {
+    renderBoss(ctx, x, y, opacity, size) {
         // Large multi-layered shadow creature
-        const color = this.revealProgress > 0.5 ? this.glowColor : '#1a1a1a';
+        const color = this.revealProgress > 0.5 ? this.glowColor : '#8899aa';
 
         ctx.fillStyle = color;
         ctx.globalAlpha = opacity;
 
-        // Outer layer
+        // Outer layer - menacing shape
         ctx.beginPath();
         for (let i = 0; i < 8; i++) {
             const angle = (i / 8) * Math.PI * 2;
-            const radius = this.size + Math.sin(Date.now() * 0.001 + i) * 5;
+            const radius = size + Math.sin(Date.now() * 0.001 + i) * (size * 0.15);
             const px = x + Math.cos(angle) * radius;
             const py = y + Math.sin(angle) * radius;
             if (i === 0) ctx.moveTo(px, py);
@@ -139,64 +168,78 @@ export class Entity {
         ctx.closePath();
         ctx.fill();
 
+        // Middle layer
+        ctx.globalAlpha = opacity * 0.8;
+        ctx.beginPath();
+        ctx.arc(x, y, size * 0.6, 0, Math.PI * 2);
+        ctx.fill();
+
         // Inner core
         ctx.fillStyle = this.revealProgress > 0.7 ? '#ffffff' : color;
+        ctx.globalAlpha = opacity * 0.6;
         ctx.beginPath();
-        ctx.arc(x, y, this.size * 0.4, 0, Math.PI * 2);
+        ctx.arc(x, y, size * 0.3, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.globalAlpha = 1;
     }
 
-    renderCreature(ctx, x, y, opacity) {
-        // Organic blob-like shape
-        const color = this.revealProgress > 0.5 ? this.glowColor : '#1a1a1a';
+    renderCreature(ctx, x, y, opacity, size) {
+        // Organic blob-like shape - more visible
+        const color = this.revealProgress > 0.5 ? this.glowColor : '#7788aa';
 
         ctx.fillStyle = color;
         ctx.globalAlpha = opacity;
         ctx.beginPath();
 
-        for (let i = 0; i < 6; i++) {
+        for (let i = 0; i <= 6; i++) {
             const angle = (i / 6) * Math.PI * 2;
-            const offset = Math.sin(Date.now() * 0.002 + i) * 3;
-            const px = x + Math.cos(angle) * (this.size + offset);
-            const py = y + Math.sin(angle) * (this.size + offset);
+            const offset = Math.sin(Date.now() * 0.002 + i) * (size * 0.2);
+            const px = x + Math.cos(angle) * (size + offset);
+            const py = y + Math.sin(angle) * (size + offset);
             if (i === 0) ctx.moveTo(px, py);
             else ctx.lineTo(px, py);
         }
         ctx.closePath();
         ctx.fill();
+
+        // Add some internal detail
+        if (this.revealProgress > 0.3) {
+            ctx.globalAlpha = opacity * 0.5;
+            ctx.beginPath();
+            ctx.arc(x, y, size * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
         ctx.globalAlpha = 1;
     }
 
-    renderArtifact(ctx, x, y, opacity) {
-        // Geometric crystalline shape
-        const color = this.revealProgress > 0.5 ? this.glowColor : '#1a1a1a';
+    renderArtifact(ctx, x, y, opacity, size) {
+        // Geometric crystalline shape - brighter default color
+        const color = this.revealProgress > 0.5 ? this.glowColor : '#6677bb';
 
         ctx.fillStyle = color;
         ctx.globalAlpha = opacity;
 
         // Draw diamond/crystal
         ctx.beginPath();
-        ctx.moveTo(x, y - this.size);
-        ctx.lineTo(x + this.size * 0.6, y);
-        ctx.lineTo(x, y + this.size);
-        ctx.lineTo(x - this.size * 0.6, y);
+        ctx.moveTo(x, y - size);
+        ctx.lineTo(x + size * 0.6, y);
+        ctx.lineTo(x, y + size);
+        ctx.lineTo(x - size * 0.6, y);
         ctx.closePath();
         ctx.fill();
 
         // Inner facets
-        if (this.revealProgress > 0.5) {
-            ctx.fillStyle = this.accentColor;
-            ctx.globalAlpha = opacity * 0.7;
-            ctx.beginPath();
-            ctx.moveTo(x, y - this.size * 0.5);
-            ctx.lineTo(x + this.size * 0.3, y);
-            ctx.lineTo(x, y + this.size * 0.5);
-            ctx.lineTo(x - this.size * 0.3, y);
-            ctx.closePath();
-            ctx.fill();
-        }
+        ctx.fillStyle = this.revealProgress > 0.3 ? this.glowColor : this.accentColor;
+        ctx.globalAlpha = opacity * 0.7;
+        ctx.beginPath();
+        ctx.moveTo(x, y - size * 0.5);
+        ctx.lineTo(x + size * 0.3, y);
+        ctx.lineTo(x, y + size * 0.5);
+        ctx.lineTo(x - size * 0.3, y);
+        ctx.closePath();
+        ctx.fill();
 
         ctx.globalAlpha = 1;
     }
