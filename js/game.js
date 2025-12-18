@@ -102,10 +102,47 @@ export class Game {
         requestAnimationFrame((time) => this.gameLoop(time));
     }
 
+    onEntityDiscovered(entity) {
+        console.log('Discovered:', entity.name);
+
+        // Update journal
+        this.journal.markDiscovered(entity.id);
+
+        // Play discovery sound
+        this.audio.playDiscovery(entity.isBoss);
+
+        // Check if boss - trigger specific logic
+        if (entity.isBoss) {
+            // Auto open journal to show the boss entry
+            // This forces the user to encounter the journal entry as requested
+            setTimeout(() => {
+                this.journal.open();
+                // We'll hook into the journal close event to trigger transition
+                this.pendingBossTransition = true;
+            }, 500);
+        } else {
+            // For normal entities, just show a small notification log if we had a UI for it
+            // Current UI is minimal, so the sound and glow is the feedback
+        }
+    }
+
     update(deltaTime) {
         // Handle journal toggle
         if (this.input.wasJournalToggled()) {
             this.journal.toggle();
+
+            // If we closed the journal and have a pending boss transition
+            if (!this.journal.isOpen && this.pendingBossTransition) {
+                this.pendingBossTransition = false;
+                this.triggerRegionTransition();
+            }
+        }
+
+        // Also check if journal was closed by clicking X (handled internally by Journal class but need to check state)
+        // If pending transition is true but journal is NOT open, it means it was just closed
+        if (this.pendingBossTransition && !this.journal.isOpen) {
+            this.pendingBossTransition = false;
+            this.triggerRegionTransition();
         }
 
         // Don't update game when journal is open
@@ -134,53 +171,10 @@ export class Game {
         }
     }
 
-    updateCamera() {
-        // Smooth camera following
-        const targetX = this.player.x - this.canvas.width / 2;
-        const targetY = this.player.y - this.canvas.height / 2;
-
-        this.camera.x += (targetX - this.camera.x) * 0.1;
-        this.camera.y += (targetY - this.camera.y) * 0.1;
-
-        // Keep camera within world bounds
-        const bounds = this.world.getBounds();
-        this.camera.x = Math.max(0, Math.min(bounds.width - this.canvas.width, this.camera.x));
-        this.camera.y = Math.max(0, Math.min(bounds.height - this.canvas.height, this.camera.y));
-    }
-
-    render() {
-        // Clear canvas
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-        // Render world background
-        this.world.render(this.ctx, this.camera, this.canvas.width, this.canvas.height);
-
-        // Render entities
-        this.entities.forEach(entity => {
-            entity.render(this.ctx, this.camera);
-        });
-
-        // Render player
-        this.player.render(this.ctx, this.camera);
-    }
-
-    onEntityDiscovered(entity) {
-        console.log('Discovered:', entity.name);
-
-        // Update journal
-        this.journal.markDiscovered(entity.id);
-
-        // Play discovery sound
-        this.audio.playDiscovery(entity.isBoss);
-
-        // Check if boss - trigger region transition
-        if (entity.isBoss) {
-            const currentRegion = this.world.getCurrentRegion();
-            if (currentRegion.nextRegion) {
-                setTimeout(() => {
-                    this.world.startTransition(currentRegion.nextRegion);
-                }, 1000);
-            }
+    triggerRegionTransition() {
+        const currentRegion = this.world.getCurrentRegion();
+        if (currentRegion.nextRegion) {
+            this.world.startTransition(currentRegion.nextRegion);
         }
     }
 

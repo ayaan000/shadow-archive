@@ -51,21 +51,23 @@ export const REGIONS = {
 export const ENTITIES = {
     forest: [
         {
-            id: 'forest_wisp',
-            name: 'Ancient Wisp',
+            id: 'forest_cat',
+            name: 'Forest Cat',
             type: 'creature',
+            sprite: 'cat',
             region: 'forest',
             x: 400,
             y: 300,
             size: 25,
             isBoss: false,
             moving: true,
-            description: 'A flickering spirit that has watched over this forest for centuries. Its light dims and brightens with the rhythm of forgotten songs.'
+            description: 'A small feline spirit with mossy fur. It watches silently from the shadows, guiding travelers with its glowing eyes.'
         },
         {
             id: 'forest_stone',
             name: 'Whispering Stone',
             type: 'artifact',
+            sprite: 'stone',
             region: 'forest',
             x: 800,
             y: 500,
@@ -76,8 +78,9 @@ export const ENTITIES = {
         },
         {
             id: 'forest_sprite',
-            name: 'Forest Sprite',
+            name: 'Wandering Spirit',
             type: 'creature',
+            sprite: 'cat', // Reusing cat sprite but maybe tinted differently in render
             region: 'forest',
             x: 1200,
             y: 400,
@@ -88,15 +91,16 @@ export const ENTITIES = {
         },
         {
             id: 'forest_elder',
-            name: 'The Elder Guardian',
+            name: 'The Guardian Stag',
             type: 'boss',
+            sprite: 'boss_stag',
             region: 'forest',
             x: 1300,
             y: 800,
             size: 60,
             isBoss: true,
             moving: true,
-            description: 'The ancient protector of the forest realm. Its presence is overwhelming, yet peaceful. Once discovered, it grants passage to colder lands.'
+            description: 'The ancient protector of the forest realm. Its antlers reach for the stars. Discovery grants passage to colder lands.'
         }
     ],
     ice: [
@@ -104,6 +108,7 @@ export const ENTITIES = {
             id: 'ice_shard',
             name: 'Frozen Echo',
             type: 'artifact',
+            sprite: 'crystal',
             region: 'ice',
             x: 500,
             y: 600,
@@ -113,59 +118,64 @@ export const ENTITIES = {
             description: 'A crystalline structure that seems to hold frozen moments in time. Approach carefully, for it reflects your own shadow back at you.'
         },
         {
-            id: 'ice_wanderer',
-            name: 'Glacial Wanderer',
+            id: 'ice_fox',
+            name: 'Snow Fox',
             type: 'creature',
+            sprite: 'fox',
             region: 'ice',
             x: 900,
             y: 300,
             size: 22,
             isBoss: false,
             moving: true,
-            description: 'A being made of ice and starlight, endlessly walking across the frozen plains, searching for something it cannot remember.'
+            description: 'A creature of ice and starlight, endlessly walking across the frozen plains, searching for something it cannot remember.'
         },
         {
             id: 'ice_titan',
-            name: 'The Frost Colossus',
+            name: 'The Frost Bear',
             type: 'boss',
+            sprite: 'boss_bear',
             region: 'ice',
             x: 1200,
             y: 700,
             size: 70,
             isBoss: true,
-            moving: false,
-            description: 'An immense frozen giant, dormant for eons. Its discovery causes the very air to crystallize, opening the path to forgotten ruins.'
+            moving: true, // Bears move
+            description: 'An immense frozen giant. Its discovery causes the very air to crystallize, opening the path to forgotten ruins.'
         }
     ],
     ruins: [
         {
-            id: 'ruins_keeper',
-            name: 'Silent Keeper',
+            id: 'ruins_golem',
+            name: 'Rune Golem',
             type: 'creature',
+            sprite: 'golem',
             region: 'ruins',
             x: 600,
             y: 400,
             size: 24,
             isBoss: false,
             moving: true,
-            description: 'A faceless guardian that tends to ruins that predate history itself. It moves with purpose, maintaining order in the chaos of time.'
+            description: 'A construct of stone and magic, tending to ruins that predate history itself. It moves with purpose, maintaining order.'
         },
         {
-            id: 'ruins_throne',
-            name: 'The Empty Throne',
+            id: 'ruins_tablet',
+            name: 'Ancient Tablet',
             type: 'artifact',
+            sprite: 'tablet',
             region: 'ruins',
             x: 1000,
             y: 500,
             size: 35,
             isBoss: false,
             moving: false,
-            description: 'A seat of power from a civilization that vanished without trace. The air around it hums with the weight of forgotten authority.'
+            description: 'A record from a civilization that vanished without trace. The runes glow with the weight of forgotten authority.'
         },
         {
             id: 'ruins_sovereign',
-            name: 'The Last Sovereign',
+            name: 'The Construct King',
             type: 'boss',
+            sprite: 'boss_construct',
             region: 'ruins',
             x: 1300,
             y: 600,
@@ -178,39 +188,42 @@ export const ENTITIES = {
     void: [
         {
             id: 'void_fragment',
-            name: 'Reality Fragment',
+            name: 'Void Shard',
             type: 'artifact',
+            sprite: 'void_shard',
             region: 'void',
             x: 700,
             y: 500,
             size: 26,
             isBoss: false,
             moving: true,
-            description: 'A piece of something that should not exist. It shifts between states, neither here nor there, a reminder that all things fade.'
+            description: 'A piece of something that should not exist. It shifts between states, neither here nor there.'
         },
         {
-            id: 'void_watcher',
-            name: 'The Unmade',
+            id: 'void_cat',
+            name: 'Shadow Cat',
             type: 'creature',
+            sprite: 'shadow_cat',
             region: 'void',
             x: 1100,
             y: 400,
             size: 30,
             isBoss: false,
             moving: true,
-            description: 'An entity that exists in the space between existence and non-existence. To see it is to understand the nature of endings.'
+            description: 'An entity that exists in the space between existence and non-existence. It purrs with the sound of silence.'
         },
         {
-            id: 'void_archive',
-            name: 'The Shadow Archive',
+            id: 'void_eye',
+            name: 'The All-Seeing Eye',
             type: 'boss',
+            sprite: 'boss_eye',
             region: 'void',
             x: 1200,
             y: 700,
             size: 80,
             isBoss: true,
             moving: false,
-            description: 'The heart of all forgotten things. A repository of shadows, memories, and lost worlds. You have reached the end of your journey.'
+            description: 'The heart of all forgotten things. It watches all, sees all. You have reached the end of your journey.'
         }
     ]
 };

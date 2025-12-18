@@ -1,70 +1,74 @@
-/**
- * Entity - Discoverable creatures, artifacts, and bosses in the world
- */
+import { SPRITES } from '../data/sprites.js';
 
+/**
+ * Entity - Discoverable game objects (creatures, artifacts, bosses)
+ */
 export class Entity {
-    constructor(data, regionConfig) {
-        // Core properties
+    constructor(data, region) {
+        if (!SPRITES) console.error('SPRITES import is missing!');
+        this.data = data;
+        this.region = region;
         this.id = data.id;
         this.name = data.name;
         this.type = data.type;
-        this.region = data.region;
-        this.description = data.description;
-
-        // Position and rendering
         this.x = data.x;
         this.y = data.y;
+        this.initialX = data.x;
+        this.initialY = data.y;
         this.size = data.size;
-        this.isBoss = data.isBoss;
-        this.moving = data.moving;
+        this.isBoss = data.isBoss || false;
+        this.moving = data.moving || false;
+        this.description = data.description;
 
-        // Discovery state
+        // State
         this.discovered = false;
-        this.revealProgress = 0; // 0 = shadow, 1= fully revealed
+        this.revealProgress = 0; // 0 to 1
 
-        // Movement (for moving entities)
-        this.moveAngle = Math.random() * Math.PI * 2;
-        this.moveSpeed = this.moving ? 0.5 + Math.random() * 0.5 : 0;
-        this.moveTimer = 0;
+        // Visuals
+        this.glowColor = region.glowColor;
+        this.accentColor = region.accentColor;
+        this.moveOffset = Math.random() * 1000;
+        this.moveSpeed = 0.5 + Math.random() * 0.5;
+    }
 
-        // Visual properties from region
-        this.glowColor = regionConfig.glowColor;
-        this.accentColor = regionConfig.accentColor;
+    toJournalEntry() {
+        return {
+            id: this.id,
+            name: this.name,
+            description: this.description,
+            region: this.region.name,
+            discovered: false
+        };
     }
 
     update(playerPos, deltaTime) {
+        // Handle movement if entity is moving type
+        if (this.moving) {
+            const time = Date.now() * 0.001;
+
+            if (this.isBoss) {
+                // Bosses hover slowly
+                this.y = this.initialY + Math.sin(time + this.moveOffset) * 10;
+            } else {
+                // Creatures wander slightly
+                this.x = this.initialX + Math.sin(time * this.moveSpeed + this.moveOffset) * 30;
+                this.y = this.initialY + Math.cos(time * this.moveSpeed * 0.7 + this.moveOffset) * 20;
+            }
+        }
+
         // Check distance to player for discovery
         const distance = this.distanceTo(playerPos.x, playerPos.y);
-        const detectionRadius = this.isBoss ? 150 : 100;
+        const detectionRadius = this.isBoss ? 250 : 150; // Increased radius
 
         // Gradually reveal when player is near
         if (distance < detectionRadius) {
-            this.revealProgress = Math.min(1, this.revealProgress + deltaTime * 0.5);
+            this.revealProgress = Math.min(1, this.revealProgress + deltaTime * 0.8);
 
             // Mark as discovered when fully revealed
             if (this.revealProgress >= 1 && !this.discovered) {
                 this.discovered = true;
                 return true; // Signal that discovery just happened
             }
-        } else {
-            // Fade back to shadow when player moves away (but stay discovered)
-            if (!this.discovered) {
-                this.revealProgress = Math.max(0, this.revealProgress - deltaTime * 0.3);
-            }
-        }
-
-        // Movement for moving entities
-        if (this.moving) {
-            this.moveTimer += deltaTime;
-
-            // Change direction occasionally
-            if (this.moveTimer > 3) {
-                this.moveAngle += (Math.random() - 0.5) * Math.PI * 0.5;
-                this.moveTimer = 0;
-            }
-
-            this.x += Math.cos(this.moveAngle) * this.moveSpeed;
-            this.y += Math.sin(this.moveAngle) * this.moveSpeed;
         }
 
         return false;
@@ -82,164 +86,111 @@ export class Entity {
 
         // Determine opacity based on reveal progress
         // Even undiscovered entities should be quite visible as shadows
-        const shadowOpacity = 0.6 + this.revealProgress * 0.4; // Increased from 0.3
-        const blurAmount = 10 * (1 - this.revealProgress); // Reduced blur
+        const shadowOpacity = 0.6 + this.revealProgress * 0.4;
+        const blurAmount = 5 * (1 - this.revealProgress); // Less blur for pixel art
 
         // Pulsing effect for undiscovered entities
-        const pulse = this.discovered ? 1 : (0.85 + Math.sin(Date.now() * 0.002 + this.x) * 0.15);
+        const pulse = this.discovered ? 1 : (0.9 + Math.sin(Date.now() * 0.003 + this.x) * 0.1);
         const displaySize = this.size * pulse;
 
-        // Draw larger outer glow for ALL entities (not just revealed)
-        const glowSize = displaySize * 2;
-        const glowOpacity = this.discovered ? 0.4 : 0.2;
+        // Draw glow
+        const glowSize = displaySize * 2.5;
+        const glowOpacity = this.discovered ? 0.3 : 0.15;
         const gradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, glowSize);
 
         if (this.revealProgress > 0.1) {
-            gradient.addColorStop(0, this.glowColor + Math.floor(100 * glowOpacity).toString(16).padStart(2, '0'));
-            gradient.addColorStop(0.5, this.glowColor + Math.floor(50 * glowOpacity).toString(16).padStart(2, '0'));
+            gradient.addColorStop(0, this.glowColor + Math.floor(80 * glowOpacity).toString(16).padStart(2, '0'));
+            gradient.addColorStop(0.5, this.glowColor + Math.floor(40 * glowOpacity).toString(16).padStart(2, '0'));
         } else {
             gradient.addColorStop(0, 'rgba(100, 100, 120, ' + (glowOpacity * 0.5) + ')');
-            gradient.addColorStop(0.5, 'rgba(100, 100, 120, ' + (glowOpacity * 0.2) + ')');
         }
         gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
         ctx.fillStyle = gradient;
         ctx.fillRect(screenX - glowSize, screenY - glowSize, glowSize * 2, glowSize * 2);
 
-        // Draw entity shape with less blur
+        // Draw entity sprite
         ctx.save();
-        ctx.filter = `blur(${blurAmount}px)`;
-
-        if (this.isBoss) {
-            // Boss: Large imposing shape
-            this.renderBoss(ctx, screenX, screenY, shadowOpacity, displaySize);
-        } else if (this.type === 'creature') {
-            // Creature: Organic flowing shape
-            this.renderCreature(ctx, screenX, screenY, shadowOpacity, displaySize);
-        } else {
-            // Artifact: Geometric shape
-            this.renderArtifact(ctx, screenX, screenY, shadowOpacity, displaySize);
+        if (!this.discovered) {
+            ctx.filter = `blur(${blurAmount}px)`;
+            ctx.fillStyle = '#000000'; // Pure shadow when not discovered
         }
+
+        this.renderSprite(ctx, screenX, screenY, displaySize, shadowOpacity);
 
         ctx.restore();
 
-        // Pulsing outer ring for discovered entities
-        if (this.discovered) {
+        // Pulsing outer ring for discovered entities (boss only)
+        if (this.discovered && this.isBoss) {
             const ringPulse = 0.8 + Math.sin(Date.now() * 0.003) * 0.2;
             ctx.globalAlpha = ringPulse * 0.4;
             ctx.strokeStyle = this.glowColor;
-            ctx.lineWidth = 3;
+            ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.arc(screenX, screenY, displaySize * 1.3, 0, Math.PI * 2);
+            ctx.arc(screenX, screenY, displaySize * 1.5, 0, Math.PI * 2);
             ctx.stroke();
             ctx.globalAlpha = 1;
         }
 
-        // Add discovery indicator (question mark for undiscovered, exclamation for discovered)
+        // Discovery indicator
         if (!this.discovered && this.revealProgress < 0.5) {
             ctx.save();
-            ctx.globalAlpha = 0.6 * (1 - this.revealProgress * 2);
+            ctx.globalAlpha = 0.8 * (1 - this.revealProgress * 2);
             ctx.fillStyle = '#ffffff';
-            ctx.font = `${displaySize * 0.8}px Arial`;
+            ctx.font = `${displaySize * 0.6}px monospace`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('?', screenX, screenY);
+            ctx.fillText('?', screenX, screenY - displaySize * 1.2);
             ctx.restore();
         }
     }
 
-    renderBoss(ctx, x, y, opacity, size) {
-        // Large multi-layered shadow creature
-        const color = this.revealProgress > 0.5 ? this.glowColor : '#8899aa';
+    renderSprite(ctx, x, y, size, opacity) {
+        // Get sprite data
+        const spriteKey = this.data.sprite || 'cat'; // Fallback to cat
+        const sprite = SPRITES[spriteKey] || SPRITES.cat;
 
-        ctx.fillStyle = color;
+        // Calculate pixel size
+        const pixelSize = (size * 2) / Math.max(sprite.width, sprite.height);
+
+        // Center the sprite
+        const startX = x - (sprite.width * pixelSize) / 2;
+        const startY = y - (sprite.height * pixelSize) / 2;
+
+        // Determine frame for animation (if moving)
+        const frameIndex = this.moving ? Math.floor(Date.now() / 500) % sprite.frames.length : 0;
+        const frame = sprite.frames[frameIndex];
+
+        // Set context alpha
         ctx.globalAlpha = opacity;
 
-        // Outer layer - menacing shape
-        ctx.beginPath();
-        for (let i = 0; i < 8; i++) {
-            const angle = (i / 8) * Math.PI * 2;
-            const radius = size + Math.sin(Date.now() * 0.001 + i) * (size * 0.15);
-            const px = x + Math.cos(angle) * radius;
-            const py = y + Math.sin(angle) * radius;
-            if (i === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
+        // Draw pixels
+        for (let row = 0; row < frame.length; row++) {
+            const rowStr = frame[row]; // e.g. " ....xxx... "
+            for (let col = 0; col < rowStr.length; col++) {
+                const char = rowStr[col];
+                if (char === ' ') continue; // Skip padding
+                if (char === '.') continue; // Transparent
+
+                // Determine color
+                if (this.discovered) {
+                    if (char === 'x') ctx.fillStyle = this.accentColor;
+                    else if (char === 'o') ctx.fillStyle = this.glowColor; // Eyes/glows
+                    else ctx.fillStyle = '#ffffff';
+                } else {
+                    // Silhouette mode
+                    ctx.fillStyle = this.glowColor; // Use glow color for shadow shape
+                }
+
+                // Draw pixel rect
+                ctx.fillRect(
+                    startX + col * pixelSize,
+                    startY + row * pixelSize,
+                    pixelSize + 0.5, // +0.5 to prevent gap lines
+                    pixelSize + 0.5
+                );
+            }
         }
-        ctx.closePath();
-        ctx.fill();
-
-        // Middle layer
-        ctx.globalAlpha = opacity * 0.8;
-        ctx.beginPath();
-        ctx.arc(x, y, size * 0.6, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Inner core
-        ctx.fillStyle = this.revealProgress > 0.7 ? '#ffffff' : color;
-        ctx.globalAlpha = opacity * 0.6;
-        ctx.beginPath();
-        ctx.arc(x, y, size * 0.3, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.globalAlpha = 1;
-    }
-
-    renderCreature(ctx, x, y, opacity, size) {
-        // Organic blob-like shape - more visible
-        const color = this.revealProgress > 0.5 ? this.glowColor : '#7788aa';
-
-        ctx.fillStyle = color;
-        ctx.globalAlpha = opacity;
-        ctx.beginPath();
-
-        for (let i = 0; i <= 6; i++) {
-            const angle = (i / 6) * Math.PI * 2;
-            const offset = Math.sin(Date.now() * 0.002 + i) * (size * 0.2);
-            const px = x + Math.cos(angle) * (size + offset);
-            const py = y + Math.sin(angle) * (size + offset);
-            if (i === 0) ctx.moveTo(px, py);
-            else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        ctx.fill();
-
-        // Add some internal detail
-        if (this.revealProgress > 0.3) {
-            ctx.globalAlpha = opacity * 0.5;
-            ctx.beginPath();
-            ctx.arc(x, y, size * 0.5, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        ctx.globalAlpha = 1;
-    }
-
-    renderArtifact(ctx, x, y, opacity, size) {
-        // Geometric crystalline shape - brighter default color
-        const color = this.revealProgress > 0.5 ? this.glowColor : '#6677bb';
-
-        ctx.fillStyle = color;
-        ctx.globalAlpha = opacity;
-
-        // Draw diamond/crystal
-        ctx.beginPath();
-        ctx.moveTo(x, y - size);
-        ctx.lineTo(x + size * 0.6, y);
-        ctx.lineTo(x, y + size);
-        ctx.lineTo(x - size * 0.6, y);
-        ctx.closePath();
-        ctx.fill();
-
-        // Inner facets
-        ctx.fillStyle = this.revealProgress > 0.3 ? this.glowColor : this.accentColor;
-        ctx.globalAlpha = opacity * 0.7;
-        ctx.beginPath();
-        ctx.moveTo(x, y - size * 0.5);
-        ctx.lineTo(x + size * 0.3, y);
-        ctx.lineTo(x, y + size * 0.5);
-        ctx.lineTo(x - size * 0.3, y);
-        ctx.closePath();
-        ctx.fill();
 
         ctx.globalAlpha = 1;
     }
@@ -250,13 +201,5 @@ export class Entity {
         return Math.sqrt(dx * dx + dy * dy);
     }
 
-    toJournalEntry() {
-        return {
-            id: this.id,
-            name: this.name,
-            region: this.region,
-            description: this.description,
-            discovered: this.discovered
-        };
-    }
+
 }
