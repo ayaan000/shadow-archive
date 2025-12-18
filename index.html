@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Shadow Archive</title>
+    <meta name="description" content="A minimalist exploration game about discovery in the shadows">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Main game canvas -->
+    <canvas id="game-canvas"></canvas>
+    
+    <!-- Journal UI overlay (hidden by default) -->
+    <div id="journal-ui" class="hidden">
+        <div class="journal-container">
+            <div class="journal-header">
+                <h1>Shadow Archive</h1>
+                <button id="close-journal" class="close-btn">×</button>
+            </div>
+            <div class="journal-content" id="journal-content">
+                <!-- Dynamically populated entries -->
+            </div>
+            <div class="journal-footer">
+                <p>Press J to toggle journal</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game UI overlay -->
+    <div id="game-ui">
+        <div class="instruction">WASD to move • J for journal</div>
+        <div class="region-name" id="region-name">The Forest</div>
+    </div>
+
+    <!-- Load game modules -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
