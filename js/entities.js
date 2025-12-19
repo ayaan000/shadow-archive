@@ -1,11 +1,10 @@
-import { SPRITES } from '../data/sprites.js';
+import { SPRITES } from '../data/game_sprites.js';
 
 /**
  * Entity - Discoverable game objects (creatures, artifacts, bosses)
  */
 export class Entity {
     constructor(data, region) {
-        if (!SPRITES) console.error('SPRITES import is missing!');
         this.data = data;
         this.region = region;
         this.id = data.id;

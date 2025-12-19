@@ -92,14 +92,36 @@ export class Game {
         const deltaTime = this.lastTime ? (currentTime - this.lastTime) / 1000 : 0;
         this.lastTime = currentTime;
 
-        // Update
-        this.update(deltaTime);
+        try {
+            // Update
+            this.update(deltaTime);
 
-        // Render
-        this.render();
+            // Render
+            this.render();
+        } catch (e) {
+            console.error('Game Loop Error:', e);
+            this.running = false;
+        }
 
         // Continue loop
         requestAnimationFrame((time) => this.gameLoop(time));
+    }
+
+    render() {
+        console.log('Render loop started.');
+        // Clear canvas
+        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Render world background
+        this.world.render(this.ctx, this.camera, this.canvas.width, this.canvas.height);
+
+        // Render entities
+        this.entities.forEach(entity => {
+            entity.render(this.ctx, this.camera);
+        });
+
+        // Render player
+        this.player.render(this.ctx, this.camera);
     }
 
     onEntityDiscovered(entity) {
