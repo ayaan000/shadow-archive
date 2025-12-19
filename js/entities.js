@@ -1,4 +1,4 @@
-import { SPRITES } from '../data/game_sprites.js';
+import { SPRITES } from '../data/sprites.js';
 
 /**
  * Entity - Discoverable game objects (creatures, artifacts, bosses)

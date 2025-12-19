@@ -89,143 +89,146 @@ export class Game {
         if (!this.running) return;
 
         // Calculate delta time in seconds
-        const deltaTime = this.lastTime ? (currentTime - this.lastTime) / 1000 : 0;
-        this.lastTime = currentTime;
+        gameLoop(currentTime) {
+            if (!this.running) return;
 
-        try {
+            // Calculate delta time in seconds
+            const deltaTime = this.lastTime ? (currentTime - this.lastTime) / 1000 : 0;
+            this.lastTime = currentTime;
+
             // Update
             this.update(deltaTime);
 
             // Render
             this.render();
-        } catch (e) {
-            console.error('Game Loop Error:', e);
-            this.running = false;
+
+            // Continue loop
+            requestAnimationFrame((time) => this.gameLoop(time));
         }
 
-        // Continue loop
-        requestAnimationFrame((time) => this.gameLoop(time));
-    }
-
-    render() {
-        console.log('Render loop started.');
-        // Clear canvas
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-
-        // Render world background
-        this.world.render(this.ctx, this.camera, this.canvas.width, this.canvas.height);
-
-        // Render entities
-        this.entities.forEach(entity => {
-            entity.render(this.ctx, this.camera);
-        });
-
-        // Render player
-        this.player.render(this.ctx, this.camera);
-    }
-
-    onEntityDiscovered(entity) {
-        console.log('Discovered:', entity.name);
-
-        // Update journal
-        this.journal.markDiscovered(entity.id);
-
-        // Play discovery sound
-        this.audio.playDiscovery(entity.isBoss);
-
-        // Check if boss - trigger specific logic
-        if (entity.isBoss) {
-            // Auto open journal to show the boss entry
-            // This forces the user to encounter the journal entry as requested
-            setTimeout(() => {
-                this.journal.open();
-                // We'll hook into the journal close event to trigger transition
-                this.pendingBossTransition = true;
-            }, 500);
-        } else {
-            // For normal entities, just show a small notification log if we had a UI for it
-            // Current UI is minimal, so the sound and glow is the feedback
+        updateCamera() {
+            this.camera.x = this.player.x - this.canvas.width / 2;
+            this.camera.y = this.player.y - this.canvas.height / 2;
         }
-    }
 
-    update(deltaTime) {
-        // Handle journal toggle
-        if (this.input.wasJournalToggled()) {
-            this.journal.toggle();
+        render() {
+            // Clear canvas
+            this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-            // If we closed the journal and have a pending boss transition
-            if (!this.journal.isOpen && this.pendingBossTransition) {
+            // Render world background
+            this.world.render(this.ctx, this.camera, this.canvas.width, this.canvas.height);
+
+            // Render entities
+            this.entities.forEach(entity => {
+                entity.render(this.ctx, this.camera);
+            });
+
+            // Render player
+            this.player.render(this.ctx, this.camera);
+        }
+
+        onEntityDiscovered(entity) {
+            console.log('Discovered:', entity.name);
+
+            // Update journal
+            this.journal.markDiscovered(entity.id);
+
+            // Play discovery sound
+            this.audio.playDiscovery(entity.isBoss);
+
+            // Check if boss - trigger specific logic
+            if (entity.isBoss) {
+                // Auto open journal to show the boss entry
+                // This forces the user to encounter the journal entry as requested
+                setTimeout(() => {
+                    this.journal.open();
+                    // We'll hook into the journal close event to trigger transition
+                    this.pendingBossTransition = true;
+                }, 500);
+            } else {
+                // For normal entities, just show a small notification log if we had a UI for it
+                // Current UI is minimal, so the sound and glow is the feedback
+            }
+        }
+
+        update(deltaTime) {
+            // Handle journal toggle
+            if (this.input.wasJournalToggled()) {
+                this.journal.toggle();
+
+                // If we closed the journal and have a pending boss transition
+                if (!this.journal.isOpen && this.pendingBossTransition) {
+                    this.pendingBossTransition = false;
+                    this.triggerRegionTransition();
+                }
+            }
+
+            // Also check if journal was closed by clicking X (handled internally by Journal class but need to check state)
+            // If pending transition is true but journal is NOT open, it means it was just closed
+            if (this.pendingBossTransition && !this.journal.isOpen) {
                 this.pendingBossTransition = false;
                 this.triggerRegionTransition();
             }
-        }
 
-        // Also check if journal was closed by clicking X (handled internally by Journal class but need to check state)
-        // If pending transition is true but journal is NOT open, it means it was just closed
-        if (this.pendingBossTransition && !this.journal.isOpen) {
-            this.pendingBossTransition = false;
-            this.triggerRegionTransition();
-        }
+            // Don't update game when journal is open
+            if (this.journal.isOpen) return;
 
-        // Don't update game when journal is open
-        if (this.journal.isOpen) return;
+            // Update player
+            this.player.update(this.input, this.world.getBounds());
 
-        // Update player
-        this.player.update(this.input, this.world.getBounds());
+            // Update camera to follow player
+            this.updateCamera();
 
-        // Update camera to follow player
-        this.updateCamera();
+            // Update entities and check for discoveries
+            const playerPos = this.player.getPosition();
+            this.entities.forEach(entity => {
+                const justDiscovered = entity.update(playerPos, deltaTime);
 
-        // Update entities and check for discoveries
-        const playerPos = this.player.getPosition();
-        this.entities.forEach(entity => {
-            const justDiscovered = entity.update(playerPos, deltaTime);
+                if (justDiscovered) {
+                    this.onEntityDiscovered(entity);
+                }
+            });
 
-            if (justDiscovered) {
-                this.onEntityDiscovered(entity);
+            // Update world (handles transitions)
+            const transitionComplete = this.world.update(deltaTime);
+            if (transitionComplete) {
+                this.onRegionChanged();
             }
-        });
+        }
 
-        // Update world (handles transitions)
-        const transitionComplete = this.world.update(deltaTime);
-        if (transitionComplete) {
-            this.onRegionChanged();
+        triggerRegionTransition() {
+            const currentRegion = this.world.getCurrentRegion();
+            if (currentRegion.nextRegion) {
+                this.world.startTransition(currentRegion.nextRegion);
+            }
+        }
+
+        onRegionChanged() {
+            const newRegion = this.world.getCurrentRegion();
+            console.log('Entered region:', newRegion.name);
+
+            // Load new region entities
+            this.loadRegionEntities(newRegion.id);
+            this.loadSavedProgress(); // Restore discovered state
+
+            // Update audio
+            this.audio.stopAmbience();
+            setTimeout(() => {
+                this.audio.playAmbience(newRegion.id);
+            }, 500);
+
+            // Move player to start of new region
+            this.player.x = 200;
+            this.player.y = newRegion.height / 2;
+
+            // Update UI
+            this.updateRegionUI();
+        }
+
+        updateRegionUI() {
+            const regionName = document.getElementById('region-name');
+            if (regionName) {
+                regionName.textContent = this.world.getCurrentRegion().name;
+            }
         }
     }
-
-    triggerRegionTransition() {
-        const currentRegion = this.world.getCurrentRegion();
-        if (currentRegion.nextRegion) {
-            this.world.startTransition(currentRegion.nextRegion);
-        }
-    }
-
-    onRegionChanged() {
-        const newRegion = this.world.getCurrentRegion();
-        console.log('Entered region:', newRegion.name);
-
-        // Load new region entities
-        this.loadRegionEntities(newRegion.id);
-        this.loadSavedProgress(); // Restore discovered state
-
-        // Update audio
-        this.audio.stopAmbience();
-        setTimeout(() => {
-            this.audio.playAmbience(newRegion.id);
-        }, 500);
-
-        // Move player to start of new region
-        this.player.x = 200;
-        this.player.y = newRegion.height / 2;
-
-        // Update UI
-        this.updateRegionUI();
-    }
-
-    updateRegionUI() {
-        const regionName = document.getElementById('region-name');
-        if (regionName) {
-            regionName.textContent = this.world.getCurrentRegion().name;
-        }
-    }
-}

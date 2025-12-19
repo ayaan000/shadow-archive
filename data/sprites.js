@@ -1,10 +1,6 @@
 /**
  * Pixel Art Sprites
  * Defined as 8x8 or 16x16 grids of characters
- * . = transparent
- * x = primary color
- * o = secondary color (eyes/accents)
- * - = tertiary color (details)
  */
 
 export const SPRITES = {
@@ -179,6 +175,7 @@ export const SPRITES = {
                 "xxxxxxxxx...",
                 "xxxxxxxxxxx.",
                 ".xxxxxxxxxxx",
+                ".xxxxxxxxxxx",
                 ".xxx.xxx.xxx",
                 ".xxx.....xxx",
                 "............",
@@ -218,8 +215,8 @@ export const SPRITES = {
         ]]
     },
 
-    // Bosses (Larger)
-    boss_stag: { // Forest Boss
+    // Bosses
+    boss_stag: {
         width: 16,
         height: 16,
         frames: [[
@@ -242,7 +239,7 @@ export const SPRITES = {
         ]]
     },
 
-    boss_bear: { // Ice Boss
+    boss_bear: {
         width: 18,
         height: 14,
         frames: [[
@@ -263,7 +260,7 @@ export const SPRITES = {
         ]]
     },
 
-    boss_construct: { // Ruins Boss
+    boss_construct: {
         width: 16,
         height: 18,
         frames: [[
@@ -288,7 +285,7 @@ export const SPRITES = {
         ]]
     },
 
-    boss_eye: { // Void Boss
+    boss_eye: {
         width: 16,
         height: 16,
         frames: [[
