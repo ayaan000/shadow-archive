@@ -91,30 +91,22 @@ export class Entity {
         }
 
         const shadowOpacity = 0.6 + this.revealProgress * 0.4;
-        const blurAmount = 5 * (1 - this.revealProgress);
-
         const pulse = this.discovered ? 1 : (0.9 + Math.sin(Date.now() * 0.003 + this.x) * 0.1);
         const displaySize = this.size * pulse;
 
-        // Draw glow
-        const glowSize = displaySize * 2.5;
-        const glowOpacity = this.discovered ? 0.3 : 0.15;
-        const gradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, glowSize);
-
-        if (this.revealProgress > 0.1) {
-            gradient.addColorStop(0, this.glowColor + Math.floor(80 * glowOpacity).toString(16).padStart(2, '0'));
-            gradient.addColorStop(0.5, this.glowColor + Math.floor(40 * glowOpacity).toString(16).padStart(2, '0'));
-        } else {
-            gradient.addColorStop(0, 'rgba(100, 100, 120, ' + (glowOpacity * 0.5) + ')');
-        }
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-        ctx.fillStyle = gradient;
-        ctx.fillRect(screenX - glowSize, screenY - glowSize, glowSize * 2, glowSize * 2);
+        // Simple glow (no gradient for performance)
+        const glowSize = displaySize * 2;
+        ctx.globalAlpha = this.discovered ? 0.2 : 0.1;
+        ctx.fillStyle = this.glowColor;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, glowSize, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
 
         // Draw entity sprite
         ctx.save();
         if (!this.discovered) {
+            const blurAmount = 3 * (1 - this.revealProgress);
             ctx.filter = `blur(${blurAmount}px)`;
         }
 

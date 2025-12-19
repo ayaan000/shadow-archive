@@ -1,5 +1,6 @@
 /**
  * World - Manages regions, rendering, and transitions
+ * OPTIMIZED version with cached values and reduced per-frame calculations
  */
 
 import { REGIONS } from '../data/content.js';
@@ -13,22 +14,28 @@ export class World {
 
         // Generate terrain features for current region
         this.terrainFeatures = this.generateTerrainFeatures();
+
+        // Cache for fog gradient (recreated on resize)
+        this.fogGradient = null;
+        this.lastWidth = 0;
+        this.lastHeight = 0;
     }
 
     generateTerrainFeatures() {
         const features = [];
         const region = this.currentRegion;
 
-        // Generate random terrain features based on region
-        const featureCount = 30 + Math.floor(Math.random() * 20);
+        // Reduced feature count for performance
+        const featureCount = 20 + Math.floor(Math.random() * 15);
 
         for (let i = 0; i < featureCount; i++) {
             features.push({
                 x: Math.random() * region.width,
                 y: Math.random() * region.height,
-                type: Math.floor(Math.random() * 3), // 0=tree, 1=rock, 2=grass
+                type: Math.floor(Math.random() * 3),
                 size: 20 + Math.random() * 40,
-                seed: Math.random() * 1000
+                seed: Math.random() * 1000,
+                opacity: 0.15 + Math.random() * 0.1 // Pre-calculated opacity
             });
         }
 
@@ -44,7 +51,8 @@ export class World {
                 this.transitioning = false;
                 this.transitionProgress = 0;
                 this.terrainFeatures = this.generateTerrainFeatures();
-                return true; // Transition complete
+                this.fogGradient = null; // Reset fog gradient
+                return true;
             }
         }
         return false;
@@ -55,95 +63,84 @@ export class World {
         ctx.fillStyle = this.currentRegion.bgColor;
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-        // Render terrain features first (behind entities)
+        // Render terrain features (optimized)
         this.renderTerrainFeatures(ctx, camera);
 
-        // Add subtle ambient particles/stars
+        // Render ambient particles (reduced count)
         this.renderAmbience(ctx, camera, canvasWidth, canvasHeight);
 
-        // Render atmospheric fog
-        this.renderFog(ctx, camera, canvasWidth, canvasHeight);
+        // Render atmospheric fog (cached gradient)
+        this.renderFog(ctx, canvasWidth, canvasHeight);
     }
 
     renderTerrainFeatures(ctx, camera) {
         const region = this.currentRegion;
+        const cw = ctx.canvas.width;
+        const ch = ctx.canvas.height;
 
-        this.terrainFeatures.forEach(feature => {
+        for (let i = 0; i < this.terrainFeatures.length; i++) {
+            const feature = this.terrainFeatures[i];
             const screenX = feature.x - camera.x;
             const screenY = feature.y - camera.y;
 
-            // Only render if on screen (with margin)
-            if (screenX < -100 || screenX > ctx.canvas.width + 100 ||
-                screenY < -100 || screenY > ctx.canvas.height + 100) {
-                return;
+            // Culling check
+            if (screenX < -100 || screenX > cw + 100 ||
+                screenY < -100 || screenY > ch + 100) {
+                continue;
             }
 
-            ctx.save();
-            ctx.globalAlpha = 0.2 + Math.random() * 0.1;
+            ctx.globalAlpha = feature.opacity;
+            ctx.fillStyle = region.accentColor;
 
             if (feature.type === 0) {
-                // Tree-like shapes
-                ctx.fillStyle = region.accentColor;
+                // Simple triangle for trees
                 ctx.beginPath();
                 ctx.moveTo(screenX, screenY - feature.size);
                 ctx.lineTo(screenX + feature.size * 0.4, screenY);
                 ctx.lineTo(screenX - feature.size * 0.4, screenY);
                 ctx.closePath();
                 ctx.fill();
-
-                // Trunk
-                ctx.fillStyle = region.accentColor;
-                ctx.globalAlpha = 0.15;
-                ctx.fillRect(screenX - 5, screenY, 10, feature.size * 0.3);
             } else if (feature.type === 1) {
-                // Rock-like shapes
-                ctx.fillStyle = region.accentColor;
+                // Simple circle for rocks
                 ctx.beginPath();
-                const sides = 5 + Math.floor(feature.seed % 3);
-                for (let i = 0; i < sides; i++) {
-                    const angle = (i / sides) * Math.PI * 2;
-                    const radius = feature.size * 0.5 * (0.8 + Math.sin(feature.seed + i) * 0.2);
-                    const x = screenX + Math.cos(angle) * radius;
-                    const y = screenY + Math.sin(angle) * radius;
-                    if (i === 0) ctx.moveTo(x, y);
-                    else ctx.lineTo(x, y);
-                }
-                ctx.closePath();
+                ctx.arc(screenX, screenY, feature.size * 0.4, 0, Math.PI * 2);
                 ctx.fill();
             } else {
-                // Grass/shrub
+                // Simple lines for grass
                 ctx.strokeStyle = region.accentColor;
                 ctx.lineWidth = 2;
-                for (let i = 0; i < 5; i++) {
-                    const offset = (i - 2) * 8;
-                    ctx.beginPath();
-                    ctx.moveTo(screenX + offset, screenY);
-                    ctx.lineTo(screenX + offset + Math.sin(feature.seed + i) * 3,
-                        screenY - feature.size * 0.4);
-                    ctx.stroke();
-                }
+                ctx.beginPath();
+                ctx.moveTo(screenX - 10, screenY);
+                ctx.lineTo(screenX, screenY - feature.size * 0.3);
+                ctx.moveTo(screenX + 10, screenY);
+                ctx.lineTo(screenX, screenY - feature.size * 0.25);
+                ctx.stroke();
             }
+        }
 
-            ctx.restore();
-        });
+        ctx.globalAlpha = 1;
     }
 
-    renderFog(ctx, camera, width, height) {
-        // Vignette effect
-        const gradient = ctx.createRadialGradient(
-            width / 2, height / 2, width * 0.2,
-            width / 2, height / 2, width * 0.7
-        );
-        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        gradient.addColorStop(1, this.currentRegion.bgColor + 'aa');
+    renderFog(ctx, width, height) {
+        // Cache fog gradient
+        if (!this.fogGradient || this.lastWidth !== width || this.lastHeight !== height) {
+            this.fogGradient = ctx.createRadialGradient(
+                width / 2, height / 2, width * 0.2,
+                width / 2, height / 2, width * 0.7
+            );
+            this.fogGradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            this.fogGradient.addColorStop(1, this.currentRegion.bgColor + 'aa');
+            this.lastWidth = width;
+            this.lastHeight = height;
+        }
 
-        ctx.fillStyle = gradient;
+        ctx.fillStyle = this.fogGradient;
         ctx.fillRect(0, 0, width, height);
     }
 
     renderAmbience(ctx, camera, width, height) {
-        // Draw floating particles based on region
-        const particleCount = 50;
+        // Reduced particle count for performance
+        const particleCount = 25;
         const time = Date.now() * 0.0003;
 
         ctx.fillStyle = this.currentRegion.glowColor;
@@ -152,41 +149,13 @@ export class World {
             const seed = i * 1000;
             const x = ((seed + camera.x * 0.1 + time * 20) % this.currentRegion.width) - camera.x;
             const y = ((seed * 1.5 + camera.y * 0.1 + Math.sin(time + i) * 50) % this.currentRegion.height) - camera.y;
-            const size = 1 + Math.sin(time * 2 + i) * 0.5;
 
             if (x >= 0 && x <= width && y >= 0 && y <= height) {
-                ctx.globalAlpha = 0.3 + Math.sin(time * 3 + i) * 0.2;
+                ctx.globalAlpha = 0.3;
                 ctx.beginPath();
-                ctx.arc(x, y, size, 0, Math.PI * 2);
+                ctx.arc(x, y, 1.5, 0, Math.PI * 2);
                 ctx.fill();
             }
-        }
-
-        ctx.globalAlpha = 1;
-    }
-
-    renderTexture(ctx, camera, width, height) {
-        // Subtle grid pattern
-        ctx.strokeStyle = this.currentRegion.accentColor;
-        ctx.globalAlpha = 0.05;
-        ctx.lineWidth = 1;
-
-        const gridSize = 100;
-        const startX = -(camera.x % gridSize);
-        const startY = -(camera.y % gridSize);
-
-        for (let x = startX; x < width; x += gridSize) {
-            ctx.beginPath();
-            ctx.moveTo(x, 0);
-            ctx.lineTo(x, height);
-            ctx.stroke();
-        }
-
-        for (let y = startY; y < height; y += gridSize) {
-            ctx.beginPath();
-            ctx.moveTo(0, y);
-            ctx.lineTo(width, y);
-            ctx.stroke();
         }
 
         ctx.globalAlpha = 1;
