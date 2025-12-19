@@ -46,6 +46,7 @@ export class Game {
         // Game state
         this.lastTime = 0;
         this.running = true;
+        this.pendingBossTransition = false;
 
         // Start ambient audio
         this.audio.playAmbience('forest');
@@ -92,14 +93,58 @@ export class Game {
         const deltaTime = this.lastTime ? (currentTime - this.lastTime) / 1000 : 0;
         this.lastTime = currentTime;
 
-        // Update
+        // Update game state
         this.update(deltaTime);
 
-        // Render
+        // Render everything
         this.render();
 
         // Continue loop
         requestAnimationFrame((time) => this.gameLoop(time));
+    }
+
+    update(deltaTime) {
+        // Handle journal toggle
+        if (this.input.wasJournalToggled()) {
+            this.journal.toggle();
+
+            // If we closed the journal and have a pending boss transition
+            if (!this.journal.isOpen && this.pendingBossTransition) {
+                this.pendingBossTransition = false;
+                this.triggerRegionTransition();
+            }
+        }
+
+        // Check if journal was closed by clicking X
+        if (this.pendingBossTransition && !this.journal.isOpen) {
+            this.pendingBossTransition = false;
+            this.triggerRegionTransition();
+        }
+
+        // Don't update game when journal is open
+        if (this.journal.isOpen) return;
+
+        // Update player
+        this.player.update(this.input, this.world.getBounds());
+
+        // Update camera to follow player
+        this.updateCamera();
+
+        // Update entities and check for discoveries
+        const playerPos = this.player.getPosition();
+        this.entities.forEach(entity => {
+            const justDiscovered = entity.update(playerPos, deltaTime);
+
+            if (justDiscovered) {
+                this.onEntityDiscovered(entity);
+            }
+        });
+
+        // Update world (handles transitions)
+        const transitionComplete = this.world.update(deltaTime);
+        if (transitionComplete) {
+            this.onRegionChanged();
+        }
     }
 
     updateCamera() {
@@ -134,61 +179,10 @@ export class Game {
 
         // Check if boss - trigger specific logic
         if (entity.isBoss) {
-            // Auto open journal to show the boss entry
-            // This forces the user to encounter the journal entry as requested
             setTimeout(() => {
                 this.journal.open();
-                // We'll hook into the journal close event to trigger transition
                 this.pendingBossTransition = true;
             }, 500);
-        } else {
-            // For normal entities, just show a small notification log if we had a UI for it
-            // Current UI is minimal, so the sound and glow is the feedback
-        }
-    }
-
-    update(deltaTime) {
-        // Handle journal toggle
-        if (this.input.wasJournalToggled()) {
-            this.journal.toggle();
-
-            // If we closed the journal and have a pending boss transition
-            if (!this.journal.isOpen && this.pendingBossTransition) {
-                this.pendingBossTransition = false;
-                this.triggerRegionTransition();
-            }
-        }
-
-        // Also check if journal was closed by clicking X (handled internally by Journal class but need to check state)
-        // If pending transition is true but journal is NOT open, it means it was just closed
-        if (this.pendingBossTransition && !this.journal.isOpen) {
-            this.pendingBossTransition = false;
-            this.triggerRegionTransition();
-        }
-
-        // Don't update game when journal is open
-        if (this.journal.isOpen) return;
-
-        // Update player
-        this.player.update(this.input, this.world.getBounds());
-
-        // Update camera to follow player
-        this.updateCamera();
-
-        // Update entities and check for discoveries
-        const playerPos = this.player.getPosition();
-        this.entities.forEach(entity => {
-            const justDiscovered = entity.update(playerPos, deltaTime);
-
-            if (justDiscovered) {
-                this.onEntityDiscovered(entity);
-            }
-        });
-
-        // Update world (handles transitions)
-        const transitionComplete = this.world.update(deltaTime);
-        if (transitionComplete) {
-            this.onRegionChanged();
         }
     }
 
@@ -205,7 +199,7 @@ export class Game {
 
         // Load new region entities
         this.loadRegionEntities(newRegion.id);
-        this.loadSavedProgress(); // Restore discovered state
+        this.loadSavedProgress();
 
         // Update audio
         this.audio.stopAmbience();

@@ -21,7 +21,7 @@ export class Entity {
 
         // State
         this.discovered = false;
-        this.revealProgress = 0; // 0 to 1
+        this.revealProgress = 0;
 
         // Visuals
         this.glowColor = region.glowColor;
@@ -46,10 +46,8 @@ export class Entity {
             const time = Date.now() * 0.001;
 
             if (this.isBoss) {
-                // Bosses hover slowly
                 this.y = this.initialY + Math.sin(time + this.moveOffset) * 10;
             } else {
-                // Creatures wander slightly
                 this.x = this.initialX + Math.sin(time * this.moveSpeed + this.moveOffset) * 30;
                 this.y = this.initialY + Math.cos(time * this.moveSpeed * 0.7 + this.moveOffset) * 20;
             }
@@ -57,20 +55,29 @@ export class Entity {
 
         // Check distance to player for discovery
         const distance = this.distanceTo(playerPos.x, playerPos.y);
-        const detectionRadius = this.isBoss ? 250 : 150; // Increased radius
+        const detectionRadius = this.isBoss ? 250 : 150;
 
         // Gradually reveal when player is near
         if (distance < detectionRadius) {
             this.revealProgress = Math.min(1, this.revealProgress + deltaTime * 0.8);
 
-            // Mark as discovered when fully revealed
             if (this.revealProgress >= 1 && !this.discovered) {
                 this.discovered = true;
-                return true; // Signal that discovery just happened
+                return true;
+            }
+        } else {
+            if (!this.discovered) {
+                this.revealProgress = Math.max(0, this.revealProgress - deltaTime * 0.5);
             }
         }
 
         return false;
+    }
+
+    distanceTo(x, y) {
+        const dx = this.x - x;
+        const dy = this.y - y;
+        return Math.sqrt(dx * dx + dy * dy);
     }
 
     render(ctx, camera) {
@@ -83,12 +90,9 @@ export class Entity {
             return;
         }
 
-        // Determine opacity based on reveal progress
-        // Even undiscovered entities should be quite visible as shadows
         const shadowOpacity = 0.6 + this.revealProgress * 0.4;
-        const blurAmount = 5 * (1 - this.revealProgress); // Less blur for pixel art
+        const blurAmount = 5 * (1 - this.revealProgress);
 
-        // Pulsing effect for undiscovered entities
         const pulse = this.discovered ? 1 : (0.9 + Math.sin(Date.now() * 0.003 + this.x) * 0.1);
         const displaySize = this.size * pulse;
 
@@ -112,14 +116,13 @@ export class Entity {
         ctx.save();
         if (!this.discovered) {
             ctx.filter = `blur(${blurAmount}px)`;
-            ctx.fillStyle = '#000000'; // Pure shadow when not discovered
         }
 
         this.renderSprite(ctx, screenX, screenY, displaySize, shadowOpacity);
 
         ctx.restore();
 
-        // Pulsing outer ring for discovered entities (boss only)
+        // Pulsing outer ring for discovered bosses
         if (this.discovered && this.isBoss) {
             const ringPulse = 0.8 + Math.sin(Date.now() * 0.003) * 0.2;
             ctx.globalAlpha = ringPulse * 0.4;
@@ -145,47 +148,37 @@ export class Entity {
     }
 
     renderSprite(ctx, x, y, size, opacity) {
-        // Get sprite data
-        const spriteKey = this.data.sprite || 'cat'; // Fallback to cat
+        const spriteKey = this.data.sprite || 'cat';
         const sprite = SPRITES[spriteKey] || SPRITES.cat;
 
-        // Calculate pixel size
         const pixelSize = (size * 2) / Math.max(sprite.width, sprite.height);
 
-        // Center the sprite
         const startX = x - (sprite.width * pixelSize) / 2;
         const startY = y - (sprite.height * pixelSize) / 2;
 
-        // Determine frame for animation (if moving)
         const frameIndex = this.moving ? Math.floor(Date.now() / 500) % sprite.frames.length : 0;
         const frame = sprite.frames[frameIndex];
 
-        // Set context alpha
         ctx.globalAlpha = opacity;
 
-        // Draw pixels
         for (let row = 0; row < frame.length; row++) {
-            const rowStr = frame[row]; // e.g. " ....xxx... "
+            const rowStr = frame[row];
             for (let col = 0; col < rowStr.length; col++) {
                 const char = rowStr[col];
-                if (char === ' ') continue; // Skip padding
-                if (char === '.') continue; // Transparent
+                if (char === ' ' || char === '.') continue;
 
-                // Determine color
                 if (this.discovered) {
                     if (char === 'x') ctx.fillStyle = this.accentColor;
-                    else if (char === 'o') ctx.fillStyle = this.glowColor; // Eyes/glows
+                    else if (char === 'o') ctx.fillStyle = this.glowColor;
                     else ctx.fillStyle = '#ffffff';
                 } else {
-                    // Silhouette mode
-                    ctx.fillStyle = this.glowColor; // Use glow color for shadow shape
+                    ctx.fillStyle = this.glowColor;
                 }
 
-                // Draw pixel rect
                 ctx.fillRect(
                     startX + col * pixelSize,
                     startY + row * pixelSize,
-                    pixelSize + 0.5, // +0.5 to prevent gap lines
+                    pixelSize + 0.5,
                     pixelSize + 0.5
                 );
             }
@@ -193,12 +186,4 @@ export class Entity {
 
         ctx.globalAlpha = 1;
     }
-
-    distanceTo(x, y) {
-        const dx = this.x - x;
-        const dy = this.y - y;
-        return Math.sqrt(dx * dx + dy * dy);
-    }
-
-
 }
