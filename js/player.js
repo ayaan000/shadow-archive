@@ -7,8 +7,8 @@ export class Player {
         this.x = x;
         this.y = y;
         this.size = 15;
-        this.speed = 3;
-        this.detectionRadius = 100; // Distance at which entities are discovered
+        this.speed = 6; // Increased from 3 for faster gameplay
+        this.detectionRadius = 100;
     }
 
     update(input, worldBounds) {

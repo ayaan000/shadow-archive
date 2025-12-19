@@ -54,6 +54,9 @@ export class Game {
         // Update UI
         this.updateRegionUI();
 
+        // Setup tutorial
+        this.setupTutorial();
+
         // Start game loop
         requestAnimationFrame((time) => this.gameLoop(time));
     }
@@ -130,13 +133,19 @@ export class Game {
         // Update camera to follow player
         this.updateCamera();
 
-        // Update entities and check for discoveries
+        // Get player position for entity updates
         const playerPos = this.player.getPosition();
+
+        // Update compass hint
+        this.updateCompassHint(playerPos);
+
+        // Update entities and check for discoveries
         this.entities.forEach(entity => {
             const justDiscovered = entity.update(playerPos, deltaTime);
 
             if (justDiscovered) {
                 this.onEntityDiscovered(entity);
+                this.updateDiscoveryCounter();
             }
         });
 
@@ -219,6 +228,51 @@ export class Game {
         const regionName = document.getElementById('region-name');
         if (regionName) {
             regionName.textContent = this.world.getCurrentRegion().name;
+        }
+        this.updateDiscoveryCounter();
+    }
+
+    updateDiscoveryCounter() {
+        const discoveredCount = document.getElementById('discovered-count');
+        const totalCount = document.getElementById('total-count');
+        if (discoveredCount && totalCount) {
+            const discovered = this.entities.filter(e => e.discovered).length;
+            discoveredCount.textContent = discovered;
+            totalCount.textContent = this.entities.length;
+        }
+    }
+
+    updateCompassHint(playerPos) {
+        const hint = document.getElementById('compass-hint');
+        if (!hint) return;
+
+        // Find nearest undiscovered entity
+        let nearestDist = Infinity;
+        for (const entity of this.entities) {
+            if (!entity.discovered) {
+                const dist = entity.distanceTo(playerPos.x, playerPos.y);
+                if (dist < nearestDist) {
+                    nearestDist = dist;
+                }
+            }
+        }
+
+        // Show hint if creature is within range
+        if (nearestDist < 300) {
+            hint.classList.add('visible');
+        } else {
+            hint.classList.remove('visible');
+        }
+    }
+
+    setupTutorial() {
+        const tutorial = document.getElementById('tutorial');
+        const startBtn = document.getElementById('start-btn');
+
+        if (startBtn && tutorial) {
+            startBtn.addEventListener('click', () => {
+                tutorial.classList.add('hidden');
+            });
         }
     }
 }

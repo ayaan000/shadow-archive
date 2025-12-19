@@ -31,8 +31,28 @@
 
     <!-- Game UI overlay -->
     <div id="game-ui">
-        <div class="instruction">WASD to move • J for journal</div>
-        <div class="region-name" id="region-name">The Forest</div>
+        <div class="top-bar">
+            <div class="instruction">WASD to move • J for journal • Find glowing creatures!</div>
+            <div class="region-name" id="region-name">The Forest</div>
+        </div>
+        <div class="discovery-counter" id="discovery-counter">
+            <span class="counter-icon">📖</span>
+            <span id="discovered-count">0</span> / <span id="total-count">0</span> discovered
+        </div>
+        <div class="compass-hint" id="compass-hint">
+            <span class="pulse-dot"></span>
+            <span class="hint-text">Creature nearby!</span>
+        </div>
+        <div class="tutorial-overlay" id="tutorial">
+            <div class="tutorial-content">
+                <h2>🌙 The Shadow Archive</h2>
+                <p>Explore the misty forest to discover mysterious creatures.</p>
+                <p>Look for <span class="glow-text">glowing shadows</span> and approach them to reveal their secrets.
+                </p>
+                <p><strong>WASD</strong> - Move &nbsp;|&nbsp; <strong>J</strong> - Journal</p>
+                <button id="start-btn">Begin Exploration</button>
+            </div>
+        </div>
     </div>
 
     <!-- Load game modules -->
